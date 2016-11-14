@@ -17,57 +17,108 @@
 #include <limits>
 #include <chrono>
 #include <fstream>
-#include "../../../no-name-master/include/partition2.h"
-#include "../../../no-name-master/include/dataset.h"
-#include "../../../no-name-master/include/union_find.h"
-#include "../../../no-name-master/include/universe.h"
+#include "./partition2.h"
+#include "./dataset.h"
+#include "./union_find.h"
+#include "./universe.h"
 
 class postPartition
 {
 public:
-	postPartition(): size(0),class_nb(0)
+	postPartition()
 	{
 		//do nothing
 	}
-	~postPartition()
-	{
-		
-	}
-
-	postPartition(const string dir): size(0),class_nb(0)
+	
+	//single aggregate
+	postPartition(const std::string dir)
 	{
 		std::map<int,int> correlate1;
 		std::vector<std::string> name1;
 		Partition2 p1=run(dir,correlate1,name1);
 		//p1*p2
 		std::vector<std::string> joinname1=JoinName(name1);
-		ID1=P2A(p1,joinname1,correlate1);
-		//std::map<std::string,std::set<int>> groupbyNameID;
-		for(unsigned int i=0;i<joinN.size();i++)
+		std::vector<std::set<int>> ID1=P2A(p1,joinname1,correlate1);
+		//
+		for(unsigned int i=0;i<size;i++)
 			groupbyNameID.insert(std::pair<std::string,std::set<int>>(joinname1[i],ID1[i]));
 	}
+	//double aggregate
+	postPartition(const std::string dir1,const std::string dir2)
+	{
+		std::map<int,int> correlate1;
+		std::vector<std::string> name1;
+		Partition2 p1=run(dir1,correlate1,name1);
+		std::map<int,int> correlate2;
+		std::vector<std::string> name2;
+		Partition2 p2=run(dir2,correlate2,name2);
+		//p1*p2
+		Partition2 p12=p1 *p2;
+		std::vector<std::string> joinname12=JoinName(name1,name2);
+		std::vector<std::set<int>> ID12=P2A(p12,joinname12,correlate1);
+		for(unsigned int i=0;i<size;i++)
+			groupbyNameID.insert(std::pair<std::string,std::set<int>>(joinname12[i],ID12[i]));
+
+
+
+	}
+	//triple aggtegate
+	postPartition(const std::string dir1,const std::string dir2,const std::string dir3)
+	{
+		std::map<int,int> correlate1;
+		std::vector<std::string> name1;
+		Partition2 p1=run(dir1,correlate1,name1);
+
+		std::map<int,int> correlate2;
+		std::vector<std::string> name2;
+		Partition2 p2=run(dir2,correlate2,name2);
+
+		std::map<int,int> correlate3;
+		std::vector<std::string> name3;
+		Partition2 p3=run(dir3,correlate3,name3);
+		//p1*p2*p3
+		Partition2 p123=p1 * p2 * p3;
+		std::vector<std::string> joinname123=JoinName(name1,name2,name3);
+		std::vector<std::set<int>> ID123=P2A(p123,joinname123,correlate1);
+		for(unsigned int i=0;i<size;i++)
+			groupbyNameID.insert(std::pair<std::string,std::set<int>>(joinname123[i],ID123[i]));
+
+
+
+
+
+	}
+
+	~postPartition()
+	{
+		
+	}
+
+	std::map<std::string,std::set<int>> getGB() const
+	{
+		return groupbyNameID;
+	}
 	
-	postPartition(const std::string dir1,const std::string dir2):size(0),class_nb(0)
-	{}
+	unsigned int getSize() const { return size; }
+	unsigned int getClass_nb() const { return class_nb; }
+	Partition2 getPartition() const { return p; }
 
-	postPartition(const std::string dir1,const std::string dir2,const std::string dir3):size(0),class_nb(0)
-	{}
-
+private:
 	Partition2 run(std::string dir,std::map<int,int>& correlate,std::vector<std::string>& attribute)
 	{
-		std::vector<std::string> IDs,attribute;
+		std::vector<std::string> IDs;
 		std::map<int,std::string> ID2atr,zero2sizeID2atr;
 		
 		Partition2 newPartition;
 		extractFromLDB(dir,IDs,attribute);
 		parseID(IDS,attribute,ID2atr,zero2sizeID2atr,correlate);
-		Partition2 newPartition=array2partition(zero2sizeID2atr);
+		newPartition=array2partition(zero2sizeID2atr);
 		
 
 		return newPartition;
 	}
 
-	int extractFromLMDB(std::string dirstd::vector<std::string>& IDs,std::vector<std::string>& attribute)
+	int extractFromLMDB(std::string dir,std::vector<std::string>& IDs,std::vector<std::string>& attribute)
 	{
 		/* Fetch key/value pairs in a read-only transaction: */
 		auto env = lmdb::env::create();
@@ -96,26 +147,26 @@ public:
 	
 	void parseID(std::vector<std::string> stringID,std::vector<std::string> atr,std::map<int,std::string>& ID2atr,std::map<int,std::string>& zero2sizeID2atr,std::map<int,int>& correlate)
 	{
-		std::set<std::string> result;
 		std::string field;
-		std::vector<std::string> IDs;
+		std::vector<int> originalID;
 		for(int i=0;i<class_nb;i++)
 		{
 			int len=stringID[i].length();
 			int index=len-1;
 			if(stringID[i][len-1]==',')
-				string[i][len-1]=='\n';
+				stringID[i][len-1]=='\n';
 			std::istringstream is(stringID[i]);
 			while(std::getline(is,field,','))
 			{
-				ID2atr.insert(std::pair<int,int>(stoi(field),atr[i]));
+				ID2atr.insert(std::pair<int,std::string>(stoi(field),atr[i]));
+				originalID.push_back(stoi(field));
 			}
 		}
 		size=ID2atr.size();
 		for(int i=0;i<size;i++)
 		{
-			correlate.insert(std::pair<int,int>(i,ID2atr[i].first()));
-			zero2sizeID2atr.insert(std::pair<int,std::string>(i,ID2atr[i].second()));
+			correlate.insert(std::pair<int,int>(i,originalID[i]));
+			zero2sizeID2atr.insert(std::pair<int,std::string>(i,ID2atr[i]));
 		}
 	}
 	
@@ -149,7 +200,37 @@ public:
 			if(joinN.end()==std::find(joinName.begin(), joinName.end(), name)
 			{
 				//std::cout<<A1[i]+"|"+A2[i]<<std::endl;
-				joinN.push_back(name);
+				joinN.push_back(name[i]);
+			}
+		}
+		//std::cout<<joinN.size()<<std::endl;
+		return joinName;
+	}
+
+	std::vector<std::string> JoinName(std::vector<std::string> name1,std::vector<std::string> name2)
+	{
+		std::vector<std::string> joinName;
+		for(int i=0;i<size;i++)
+		{	
+			if(joinN.end()==std::find(joinName.begin(), joinName.end(), name1[i]+"|"+name2[i])
+			{
+				//std::cout<<A1[i]+"|"+A2[i]<<std::endl;
+				joinN.push_back(name1[i]+"|"+name2[i]);
+			}
+		}
+		//std::cout<<joinN.size()<<std::endl;
+		return joinName;
+	}
+
+	std::vector<std::string> JoinName(std::vector<std::string> name1,std::vector<std::string> name2,std::vector<std::string> name3)
+	{
+		std::vector<std::string> joinName;
+		for(int i=0;i<size;i++)
+		{	
+			if(joinN.end()==std::find(joinName.begin(), joinName.end(), name1[i]+"|"+name2[i]+"|"+name3[i])
+			{
+				//std::cout<<A1[i]+"|"+A2[i]<<std::endl;
+				joinN.push_back(name1[i]+"|"+name2[i]+"|"+name3[i]);
 			}
 		}
 		//std::cout<<joinN.size()<<std::endl;
@@ -184,7 +265,7 @@ public:
 
 
 
-private:
+//private:
 	Partition2 p;
 	unsigned int size;
 	unsigned int class_nb;
